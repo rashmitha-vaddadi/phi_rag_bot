@@ -1,9 +1,15 @@
+# app.py
 from flask import Flask, request, jsonify
-import requests
+from rag_pipeline import RAGPipeline
+from llm_model import LocalLLM
 
 app = Flask(__name__)
 
-LLM_SERVER_URL = "http://host.docker.internal:8000/ask"  # local endpoint for RAG+LLM
+print("Loading RAG pipeline...")
+rag = RAGPipeline()
+
+print("Loading Local LLM...")
+llm = LocalLLM()
 
 @app.route("/ask", methods=["POST"])
 def ask():
@@ -11,18 +17,31 @@ def ask():
     query = data.get("query", "")
 
     if not query:
-        return jsonify({"error": "No query provided"}), 400
+        return jsonify({"error": "Query missing"}), 400
 
-    try:
-        # Forward to your local LLM+RAG service
-        response = requests.post(LLM_SERVER_URL, json={"query": query})
-        if response.status_code == 200:
-            return jsonify(response.json())
-        else:
-            return jsonify({"error": f"LLM service error: {response.text}"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # 1 — Retrieve relevant chunks
+    contexts = rag.retrieve(query)
+    context_text = "\n".join(contexts)
 
+    # 2 — Build final prompt
+    prompt = f"""
+Use the context to answer the question.
+
+Context:
+{context_text}
+
+Question: {query}
+Answer:
+"""
+
+    # 3 — Generate answer
+    answer = llm.generate(prompt)
+
+    return jsonify({
+        "query": query,
+        "answer": answer,
+        "context_used": contexts
+    })
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="127.0.0.1", port=5000)

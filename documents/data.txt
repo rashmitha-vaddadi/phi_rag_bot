@@ -1,3 +1,4 @@
-The Phi model is a small local LLM. It is used for question answering.
-This project uses RAG with Phi model and LangChain.
-The goal is to build a chatbot that runs locally.
+This project uses a local LLM with RAG.
+RAG stands for Retrieval-Augmented Generation.
+We store document chunks as embeddings and use FAISS for retrieval.
+

@@ -1,29 +1,35 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-from langchain_community.llms import HuggingFacePipeline
+# llm_model.py
 import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
-def get_phi_llm(model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
-    print("Loading Phi model...")
+class LocalLLM:
+    def __init__(self, model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+        print(f"Loading LLM model: {model_name}")
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,
-        device_map="auto"
-    )
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"Using device: {self.device}")
 
-    generate_text = pipeline(
-        "text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        max_new_tokens=200,
-        temperature=0.3
-    )
+        # Load tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    llm = HuggingFacePipeline(pipeline=generate_text)
-    return llm
+        # Load model
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+            device_map="auto" if self.device == "cuda" else None
+        )
+
+        # HF pipeline
+        self.pipeline = pipeline(
+            "text-generation",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            max_new_tokens=200
+        )
+
+    def generate(self, prompt):
+        """Generate a text response."""
+        result = self.pipeline(prompt)
+        return result[0]["generated_text"]
 
 
-if __name__ == "__main__":
-    llm = get_phi_llm()
-    print(llm.invoke("Explain transformers in simple words."))

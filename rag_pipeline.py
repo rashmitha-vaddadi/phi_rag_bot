@@ -1,57 +1,54 @@
+# rag_pipeline.py
+
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
 from sentence_transformers import SentenceTransformer
-import faiss
 import numpy as np
+import os
+
 class RAGPipeline:
-    def __init__(self, embedding_model_name="all-MiniLM-L6-v2"):
-        print("Loading embeddings...")
-        self.embedder = SentenceTransformer(embedding_model_name)
 
-        self.index = None
-        self.documents = []
-        self.embeddings = None
+    def __init__(self, docs_path="documents/data.txt"):
+        print("Initializing RAG pipeline...")
 
-    def load_documents(self, folder_path="documents"):
-        loader = TextLoader(f"{folder_path}/data.txt")
+        self.docs_path = docs_path
+
+        # Load embedding model
+        print("Loading embeddings model: all-MiniLM-L6-v2")
+        self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
+        # Load documents
+        self.load_documents()
+
+        # Build vector index
+        self.build_vectorstore()
+
+    def load_documents(self):
+        print(f"Loading documents from: {self.docs_path}")
+        loader = TextLoader(self.docs_path)
         docs = loader.load()
 
-        splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-        self.documents = splitter.split_documents(docs)
-
-
-        print(f"Loaded {len(self.documents)} chunks.")
-        print("First chunk:", self.documents[0].page_content if self.documents else "NO CHUNKS")
-
+        # Split text
+        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+        self.chunks = splitter.split_documents(docs)
 
     def build_vectorstore(self):
         print("Building FAISS vector store...")
 
-        texts = [d.page_content for d in self.documents]
-        self.embeddings = self.embedder.encode(texts)
+        texts = [c.page_content for c in self.chunks]
+        embeddings = [self.embedder.encode(t).astype(np.float32) for t in texts]
 
-        dimension = self.embeddings.shape[1]
-        self.index = faiss.IndexFlatL2(dimension)
-        self.index.add(np.array(self.embeddings))
+        self.vectorstore = FAISS.from_embeddings(texts, embeddings)
+        print("FAISS vectorstore created.")
 
     def retrieve(self, query, top_k=3):
-        q_emb = self.embedder.encode([query])
-        scores, idx = self.index.search(np.array(q_emb), top_k)
-        results = [self.documents[i].page_content for i in idx[0]]
-        return results
+        print("Retrieving context...")
+        q_emb = self.embedder.encode(query).astype(np.float32)
+
+        docs = self.vectorstore.similarity_search_by_vector(q_emb, k=top_k)
+        return [d.page_content for d in docs]
 
 
-if __name__ == "__main__":
-    from llm_model import get_phi_llm
 
-    rag = RAGPipeline()
-    rag.load_documents()
-    rag.build_vectorstore()
 
-    query = "What does this project talk about?"
-    context = rag.retrieve(query)
-
-    llm = get_phi_llm()
-
-    prompt = f"Context: {context}\n\nQuestion: {query}\nAnswer:"
-    print(llm.invoke(prompt))
