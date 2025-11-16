@@ -1,47 +1,60 @@
-# app.py
+##flask api will act as an interface between user and rag+llm
+
 from flask import Flask, request, jsonify
-from rag_pipeline import RAGPipeline
-from llm_model import LocalLLM
+from new_rag_pipeline import Rag_Pipeline
+import os
 
 app = Flask(__name__)
+rag = Rag_Pipeline()
 
-print("Loading RAG pipeline...")
-rag = RAGPipeline()
+## ----------------------
+## AUTO-LOAD DOCUMENTS ON STARTUP
+## ----------------------
 
-print("Loading Local LLM...")
-llm = LocalLLM()
+DOCUMENTS_FOLDER = "documents"
 
-@app.route("/ask", methods=["POST"])
-def ask():
-    data = request.get_json()
-    query = data.get("query", "")
+for filename in os.listdir(DOCUMENTS_FOLDER):
+    if filename.endswith(".txt"):
+        filepath = os.path.join(DOCUMENTS_FOLDER, filename)
+        with open(filepath, "r", encoding="utf-8") as f:
+            text = f.read()
+            rag.add_documents(text)
+            print(f"Loaded: {filename}")
 
-    if not query:
-        return jsonify({"error": "Query missing"}), 400
 
-    # 1 — Retrieve relevant chunks
-    contexts = rag.retrieve(query)
-    context_text = "\n".join(contexts)
+## ----------------------
+## INGEST ENDPOINT
+## ----------------------
 
-    # 2 — Build final prompt
-    prompt = f"""
-Use the context to answer the question.
+@app.route("/ingest", methods=["POST"])
+def ingest():
+    text1 = request.get_json()
+    input_text = text1.get("text")
 
-Context:
-{context_text}
+    if not input_text:
+        return jsonify({"error": "No text provided"}), 400
 
-Question: {query}
-Answer:
-"""
+    rag.add_documents(input_text)
+    return jsonify({"message": "Documents added successfully"})
 
-    # 3 — Generate answer
-    answer = llm.generate(prompt)
 
-    return jsonify({
-        "query": query,
-        "answer": answer,
-        "context_used": contexts
-    })
+## ----------------------
+## QUERY ENDPOINT
+## ----------------------
+
+@app.route("/query", methods=["POST"])
+def query():
+    text2 = request.get_json()
+    question = text2.get("question")
+
+    if not question:
+        return jsonify({"error": "No question provided"}), 400
+
+    answer = rag.generate_ans(question)
+    return jsonify({"answer": answer})
+
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000)
+    app.run(host="0.0.0.0", port=5000)
+
+
