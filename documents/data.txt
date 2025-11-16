@@ -1,4 +1,7 @@
 This project uses a local LLM with RAG.
 RAG stands for Retrieval-Augmented Generation.
 We store document chunks as embeddings and use FAISS for retrieval.
+This project was done from scratch by rashmitha vaddadi
+she will be an upcoming quant specialist at wells fargo with 20 lpa
+
 
