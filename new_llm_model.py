@@ -1,4 +1,4 @@
-'''using the llm model Gemma and also creating the wrapper class function , this wrapper class function
+'''using the llm model phi2 and also creating the wrapper class function , this wrapper class function
 helps in wrapping all the internal steps to load and run the gemma model'''
 ##imports
 '''importing pytorch as it emables Gemma to run efficiently accross hardware , helps in felxible model loading 
@@ -9,8 +9,8 @@ from transformers import AutoTokenizer , AutoModelForCausalLM
 class SimpleLLM:
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        ##calling the gemma2b model
-        self.model_used = "google/gemma-2b"
+        ##calling the phi2 model
+        self.model_used = "microsoft/phi-2"
         ##intializing autotokenizer , which will convert the chunks into token
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_used,
@@ -18,7 +18,8 @@ class SimpleLLM:
         )
         ##for initialising the model , we are using automodelforcasuallm
         self.model = AutoModelForCasualLM.from_pretrained(
-            self.model_used
+            self.model_used,
+            torch_dtype=torch.float32
         ).to(self.device)
 
     ##we are now creating a new method which will generate text , this will be the code function that
