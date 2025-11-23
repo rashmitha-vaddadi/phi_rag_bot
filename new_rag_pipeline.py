@@ -4,6 +4,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from new_llm_model import SimpleLLM
 import faiss
+import requests
+
 
 class Rag_Pipeline:
     def __init__(self):
@@ -23,7 +25,9 @@ class Rag_Pipeline:
         
         self.vectorstore = None
         ##FAISS is used for storing vector embeddings and performs similarity search and returns top similar search
-        self.llm = SimpleLLM() ##this will call my llm model
+        self.llm_url = "http://host.docker.internal:8001/generate"
+        ##host.docker.internal refers to laptop , this allows docker to call laptop
+
     
     def add_documents(self,text):
         chunks = self.split.split_text(text)
@@ -56,7 +60,7 @@ class Rag_Pipeline:
 
         ##this will add the retrived chunks into one line
         # Step 3: Create the final RAG prompt
-        final_prompt = final_prompt = f"""
+        final_prompt = f"""
         Context:
         {context}
 
@@ -67,9 +71,19 @@ class Rag_Pipeline:
         """
 
         
-        answer = self.llm.lets_chat(final_prompt)
+        response = requests.post(
+        self.llm_url,
+        json={"prompt": final_prompt}
+    )
 
+        if response.status_code != 200:
+            return "LLM server error: " + response.text
+
+        answer = response.json().get("response", "")
         return answer
+
+
+        
 
 
 
